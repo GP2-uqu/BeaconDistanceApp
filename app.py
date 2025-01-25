@@ -1,7 +1,6 @@
 import asyncio
-import time
 import math
-from flask import Flask, jsonify, request
+from flask import Flask, render_template, jsonify, request
 from bleak import BleakScanner
 
 app = Flask(__name__)
@@ -10,7 +9,6 @@ app = Flask(__name__)
 TX_POWER = -57  # RSSI at 1 meter
 PATH_LOSS_EXPONENT = 2.5  # Environmental factor
 
-# Variables to store the selected beacon
 selected_beacon = None
 latest_rssi = None
 latest_distance = None
@@ -20,12 +18,19 @@ def calculate_distance(rssi, tx_power=TX_POWER, n=PATH_LOSS_EXPONENT):
     Estimate the distance to the beacon based on RSSI.
     """
     distance = 10 ** ((tx_power - rssi) / (10 * n))
-    return round(distance, 2)  # Round to 2 decimal places for readability
+    return round(distance, 2)
+
+@app.route('/')
+def home():
+    """
+    Serve the main HTML page.
+    """
+    return render_template('index.html')
 
 @app.route('/scan', methods=['GET'])
 def scan_devices():
     """
-    Endpoint to scan for BLE devices and return a list.
+    Scan for BLE devices.
     """
     devices_with_rssi = []
 
@@ -52,7 +57,7 @@ def scan_devices():
 @app.route('/select', methods=['POST'])
 def select_device():
     """
-    Endpoint to select a beacon by MAC address.
+    Select a beacon by MAC address.
     """
     global selected_beacon
     data = request.get_json()
@@ -66,7 +71,7 @@ def select_device():
 @app.route('/ping', methods=['GET'])
 def ping_device():
     """
-    Endpoint to fetch the latest RSSI and distance of the selected beacon.
+    Ping the selected beacon and fetch RSSI and distance.
     """
     global latest_rssi, latest_distance
 
@@ -94,7 +99,6 @@ def ping_device():
         "rssi": latest_rssi,
         "distance": latest_distance
     })
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
