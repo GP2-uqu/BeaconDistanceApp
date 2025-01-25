@@ -1,70 +1,85 @@
-const TX_POWER = -57; // RSSI at 1 meter
-const PATH_LOSS_EXPONENT = 2.5; // Environmental factor
-
-let pingInterval; // To hold the interval for live updates
+let selectedDevice = null; // Store selected device
+let pingInterval = null; // For live updates
 
 document.getElementById("scan").addEventListener("click", async () => {
     const output = document.getElementById("output");
-    const stopButton = document.getElementById("stop");
     output.innerHTML = "Scanning for devices...";
 
     try {
-        const device = await navigator.bluetooth.requestDevice({
-            acceptAllDevices: true, // Allow any device
-            optionalServices: ["device_information"] // Add optional GATT services if needed
+        // Step 1: Fetch available devices
+        const response = await fetch("http://127.0.0.1:5000/scan"); // Use your Flask server address
+        const devices = await response.json();
+
+        if (devices.error) {
+            output.innerHTML = `Error: ${devices.error}`;
+            return;
+        }
+
+        // Show the list of devices
+        output.innerHTML = "Available Devices:<br>";
+        devices.forEach((device, index) => {
+            output.innerHTML += `${index + 1}: ${device.name || "Unknown"} (${device.address}) - RSSI: ${device.rssi} dBm<br>`;
         });
 
-        output.innerHTML = `Connected to: ${device.name || "Unknown"}<br>Starting live updates...`;
+        // Prompt the user to select a device
+        const choice = prompt("Enter the number of the device to select:");
+        const device = devices[parseInt(choice) - 1];
+        if (!device) {
+            output.innerHTML = "Invalid selection.";
+            return;
+        }
 
-        const server = await device.gatt.connect();
+        selectedDevice = device.address;
 
-        stopButton.style.display = "inline-block"; // Show the stop button
-        startLiveUpdates(server, output);
+        // Step 2: Select the device via the backend
+        const selectResponse = await fetch("http://127.0.0.1:5000/select", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ address: selectedDevice })
+        });
+
+        const selectResult = await selectResponse.json();
+        if (selectResult.error) {
+            output.innerHTML = `Error: ${selectResult.error}`;
+            return;
+        }
+
+        output.innerHTML = `Selected Device: ${device.name || "Unknown"} (${device.address})<br>Starting RSSI updates...`;
+
+        // Step 3: Start fetching RSSI and distance
+        startFetchingRSSI(output);
     } catch (error) {
         output.innerHTML = `Error: ${error.message}`;
     }
 });
 
-// Stop button event listener
 document.getElementById("stop").addEventListener("click", () => {
-    clearInterval(pingInterval); // Stop the live updates
-    const stopButton = document.getElementById("stop");
-    stopButton.style.display = "none"; // Hide the stop button
-    document.getElementById("output").innerHTML += "<br>Live updates stopped.";
+    clearInterval(pingInterval);
+    document.getElementById("output").innerHTML += "<br>Stopped updates.";
 });
 
-// Function to start live RSSI updates
-function startLiveUpdates(server, output) {
-    clearInterval(pingInterval); // Clear any previous interval
+function startFetchingRSSI(output) {
+    clearInterval(pingInterval);
 
     pingInterval = setInterval(async () => {
         try {
-            const rssi = await fetchRSSI(server); // Simulate or fetch RSSI
-            const distance = calculateDistance(rssi);
+            // Fetch RSSI and distance from the backend
+            const response = await fetch("http://127.0.0.1:5000/ping");
+            const data = await response.json();
+
+            if (data.error) {
+                output.innerHTML = `Error: ${data.error}`;
+                clearInterval(pingInterval);
+                return;
+            }
 
             output.innerHTML = `
-                Device: Connected<br>
-                RSSI: ${rssi} dBm<br>
-                Estimated Distance: ${distance} meters
+                Device: Beacon<br>
+                RSSI: ${data.rssi} dBm<br>
+                Estimated Distance: ${data.distance} meters
             `;
         } catch (error) {
-            output.innerHTML = `Error fetching RSSI: ${error.message}`;
-            clearInterval(pingInterval); // Stop updates if an error occurs
+            console.error("Error fetching RSSI:", error.message);
         }
-    }, 1000); // Update every second
-}
-
-// Simulate fetching RSSI (replace this with actual logic if supported by your device)
-function fetchRSSI(server) {
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            const simulatedRSSI = -60 + Math.floor(Math.random() * 10); // Simulate fluctuating RSSI
-            resolve(simulatedRSSI);
-        }, 500); // Simulate delay
-    });
-}
-
-// Calculate distance based on RSSI
-function calculateDistance(rssi) {
-    return Math.pow(10, (TX_POWER - rssi) / (10 * PATH_LOSS_EXPONENT)).toFixed(2);
+    }, 1000);
 }
