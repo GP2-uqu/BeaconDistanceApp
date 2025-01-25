@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Bluetooth Device Scanner</title>
+  </head>
+  <body>
+    <h1>Bluetooth Device Scanner</h1>
+    <button id="scan">Scan for Bluetooth Devices</button>
+    <div id="output"></div>
+    <script>
+document.getElementById("scan").addEventListener("click", async () => {
+  if (!navigator.bluetooth) {
+    document.getElementById("output").innerText = "Error: Web Bluetooth is not supported in this browser.";
+    return;
+  }
+
+  try {
+    console.log("Requesting Bluetooth Device...");
+    const device = await navigator.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: ["battery_service", "device_information"]
+    });
+    document.getElementById("output").innerText = `Connected to: ${device.name || "Unknown"}`;
+  } catch (error) {
+    document.getElementById("output").innerText = `Error: ${error.message}`;
+  }
+});
+    </script>
+  </body>
+</html>
