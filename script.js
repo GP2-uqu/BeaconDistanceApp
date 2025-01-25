@@ -10,8 +10,8 @@ document.getElementById("scan").addEventListener("click", async () => {
 
     try {
         const device = await navigator.bluetooth.requestDevice({
-            acceptAllDevices: true,
-            optionalServices: ["device_information"] // Add GATT services if needed
+            acceptAllDevices: true, // Allow any device
+            optionalServices: ["device_information"] // Add optional GATT services if needed
         });
 
         output.innerHTML = `Connected to: ${device.name || "Unknown"}<br>Starting live updates...`;
